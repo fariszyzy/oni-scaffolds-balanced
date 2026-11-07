@@ -14,10 +14,7 @@ namespace Scaffolds
 
     public static LocString DeconstructButtonText = "Remove";
     public static LocString DeconstructButtonTooltip = "Instantly remove this scaffold";
-    public static LocString SelfDestructButtonText = "Enable Self Destruct";
-    public static LocString SelfDestructButtonTooltip = "When enabled, automatically remove scaffold after some time has passed";
-    public static LocString SelfDestructButtonCancelText = "Make Permanent";
-    public static LocString SelfDestructButtonCancelTooltip = "When enabled, this scaffold will remain until manually deconstructed";
+    public static LocString UnsupportedLocation = "Scaffold needs support: place next to a solid tile, a ladder or a supported scaffold";
     public static ObjectLayer ObjectLayer = ObjectLayer.FillPlacer; // This layer doesn't seem to be used anywhere else... hopefully
 
     public override BuildingDef CreateBuildingDef()
@@ -78,8 +75,6 @@ namespace Scaffolds
 #if DEBUG
       Debug.Log($"[Scaffolds] ScaffoldConfig.ConfigureBuildingTemplate with speed settings {scaffold.upwardsMovementSpeedMultiplier} and {scaffold.downwardsMovementSpeedMultiplier}.");
 #endif
-
-      go.AddOrGet<CopyBuildingSettings>();
 
       Deconstructable deconstructable = go.GetComponent<Deconstructable>();
       if (deconstructable != null)

@@ -1,22 +1,38 @@
 ﻿using KSerialization;
 using System;
-using System.Collections.Generic;
 using UnityEngine;
-using STRINGS;
-using System.Runtime.InteropServices;
-using System.CodeDom;
 
 namespace Scaffolds
 {
   public class Scaffold : Ladder
   {
-    [Serialize]
-    private bool willSelfDestruct = !Scaffolds_Patch.Settings.PermanentByDefault;
+    private static readonly Action<object> DeconstructCallback = Deconstruct;
+    private static readonly Color32 NormalTint = new Color32(255, 255, 255, 255);
+    private static readonly Color32 UnstableTint = new Color32(255, 170, 120, 255);
 
     [Serialize]
     private float deconstructMoment = -1f;
 
+    [Serialize]
+    internal float unstableTimeRemaining = -1f;
+
     public SchedulerHandle deconstructHandle;
+
+    public bool IsSupported = true;
+
+    public int Cell { get; private set; } = Grid.InvalidCell;
+
+    public bool IsAnchor { get; private set; }
+
+    internal KBatchedAnimController animController;
+    internal ScaffoldNetworkManager.UnstableGroup Group;
+    internal int GroupIndex = -1;
+
+    private HandleVector<int>.Handle[] anchorHandles;
+    private int anchorHandleCount;
+    private Action<object> onSupportCellChangedDelegate;
+    private bool registeredInNetwork;
+    private bool cleanedUp;
 
     protected override void OnPrefabInit()
     {
@@ -25,20 +41,7 @@ namespace Scaffolds
 #if DEBUG
       Debug.Log("[Scaffolds] Scaffold OnPrefabInit");
 #endif
-
-      Subscribe(-905833192, OnCopySettingsDelegate);
-      Subscribe(493375141, OnRefreshUserMenuDelegate);
     }
-
-
-    private static readonly EventSystem.IntraObjectHandler<Scaffold> OnCopySettingsDelegate = new EventSystem.IntraObjectHandler<Scaffold>(delegate (Scaffold component, object data)
-    {
-      component.OnCopySettings(data);
-    });
-    private static readonly EventSystem.IntraObjectHandler<Scaffold> OnRefreshUserMenuDelegate = new EventSystem.IntraObjectHandler<Scaffold>(delegate (Scaffold component, object data)
-    {
-      component.OnRefreshUserMenu(data);
-    });
 
     protected override void OnSpawn()
     {
@@ -47,14 +50,126 @@ namespace Scaffolds
 #if DEBUG
       Debug.Log("[Scaffolds] Scaffold OnSpawn");
 #endif
-      if (willSelfDestruct)
-      {
-        float now = GameClock.Instance.GetTime();
-        float timeRemaining = deconstructMoment == -1 ? Scaffolds_Patch.Settings.Duration * 600.0f : deconstructMoment - now;
+      registeredInNetwork = true;
+      cleanedUp = false;
+      Cell = Grid.PosToCell(this);
+      animController = GetComponent<KBatchedAnimController>();
+
+      float now = GameClock.Instance.GetTime();
+      float timeRemaining = deconstructMoment < 0f
+        ? Mathf.Max(0.1f, Scaffolds_Patch.Settings.Duration * 600.0f)
+        : Mathf.Max(0.1f, deconstructMoment - now);
 #if DEBUG
-        Debug.Log($"[Scaffolds] Scheduling deconstruct in {timeRemaining} seconds");
+      Debug.Log($"[Scaffolds] Scheduling deconstruct in {timeRemaining} seconds");
 #endif
-        this.scheduleDeconstruct(timeRemaining);
+      this.scheduleDeconstruct(timeRemaining);
+
+      ScaffoldNetworkManager.Register(this);
+    }
+
+    public void RefreshAnchor()
+    {
+      FreeAnchorHandles();
+      IsAnchor = false;
+
+      if (cleanedUp || !Grid.IsValidCell(Cell))
+      {
+        return;
+      }
+
+      CheckAndRegisterAnchorNeighbour(Grid.CellAbove(Cell));
+      CheckAndRegisterAnchorNeighbour(Grid.CellBelow(Cell));
+      CheckAndRegisterAnchorNeighbour(Grid.CellLeft(Cell));
+      CheckAndRegisterAnchorNeighbour(Grid.CellRight(Cell));
+    }
+
+    private void CheckAndRegisterAnchorNeighbour(int neighbourCell)
+    {
+      if (!Grid.IsValidCell(neighbourCell) || !ScaffoldNetworkManager.IsSupportCell(neighbourCell))
+      {
+        return;
+      }
+
+      IsAnchor = true;
+
+      GameScenePartitioner partitioner = GameScenePartitioner.Instance;
+      if (partitioner == null)
+      {
+        return;
+      }
+
+      if (anchorHandles == null)
+      {
+        anchorHandles = new HandleVector<int>.Handle[8];
+      }
+      if (onSupportCellChangedDelegate == null)
+      {
+        onSupportCellChangedDelegate = OnSupportCellChanged;
+      }
+
+      if (anchorHandleCount + 2 <= anchorHandles.Length)
+      {
+        anchorHandles[anchorHandleCount++] = partitioner.Add(
+          "Scaffold.Solid",
+          this,
+          neighbourCell,
+          partitioner.solidChangedLayer,
+          onSupportCellChangedDelegate);
+        anchorHandles[anchorHandleCount++] = partitioner.Add(
+          "Scaffold.Building",
+          this,
+          neighbourCell,
+          partitioner.objectLayers[(int)ObjectLayer.Building],
+          onSupportCellChangedDelegate);
+      }
+    }
+
+    private void OnSupportCellChanged(object data)
+    {
+      if (cleanedUp)
+      {
+        return;
+      }
+
+      // Never add/free partitioner entries while the partitioner is dispatching this event.
+      // The batched BFS in ScaffoldNetworkManager re-evaluates (RefreshAnchor) every node it visits.
+      ScaffoldNetworkManager.MarkDirty(Cell);
+    }
+
+    private void FreeAnchorHandles()
+    {
+      if (anchorHandles == null || anchorHandleCount == 0)
+      {
+        anchorHandleCount = 0;
+        return;
+      }
+
+      GameScenePartitioner partitioner = GameScenePartitioner.Instance;
+      for (int i = 0; i < anchorHandleCount; i++)
+      {
+        if (partitioner != null && anchorHandles[i].IsValid())
+        {
+          partitioner.Free(ref anchorHandles[i]);
+        }
+        anchorHandles[i] = default;
+      }
+      anchorHandleCount = 0;
+    }
+
+    public void ApplyUnstableTint()
+    {
+      if (animController != null)
+      {
+        animController.TintColour = UnstableTint;
+      }
+    }
+
+    public void ResetVisuals()
+    {
+      if (animController != null)
+      {
+        animController.Offset = Vector3.zero;
+        animController.TintColour = NormalTint;
       }
     }
 
@@ -67,27 +182,11 @@ namespace Scaffolds
 #endif
         deconstructHandle.ClearScheduler();
       }
-      deconstructHandle = GameScheduler.Instance.Schedule(nameof(Scaffold), timeRemaining, new Action<object>(Scaffold.Deconstruct), (object)this);
+      deconstructHandle = GameScheduler.Instance.Schedule(nameof(Scaffold), timeRemaining, DeconstructCallback, this);
 
       deconstructMoment = GameClock.Instance.GetTime() + timeRemaining;
 #if DEBUG
       Debug.Log($"[Scaffolds] Scheduled deconstruct for {deconstructMoment}");
-#endif
-    }
-
-    private void unscheduleDeconstruct()
-    {
-      if (deconstructHandle.IsValid)
-      {
-#if DEBUG
-        Debug.Log("[Scaffolds] Clearing deconstruct schedule");
-#endif
-        deconstructHandle.ClearScheduler();
-      }
-
-      deconstructMoment = -1f;
-#if DEBUG
-      Debug.Log("[Scaffolds] Unscheduled deconstruct");
 #endif
     }
 
@@ -99,7 +198,15 @@ namespace Scaffolds
 #if DEBUG
         Debug.Log("[Scaffolds] Timer-triggered Scaffold Deconstruct");
 #endif
-        scaffold.GetComponent<DeconstructableScaffold>().OnDeconstruct();
+        DeconstructableScaffold deconstructable = scaffold.GetComponent<DeconstructableScaffold>();
+        if (deconstructable != null)
+        {
+          deconstructable.OnDeconstruct();
+        }
+        else
+        {
+          scaffold.gameObject.DeleteObject();
+        }
       }
       else
       {
@@ -107,73 +214,22 @@ namespace Scaffolds
       }
     }
 
-    private void EnableSelfDestruct()
-    {
-      if (!willSelfDestruct)
-      {
-        this.scheduleDeconstruct(Scaffolds_Patch.Settings.Duration * 600.0f);
-        willSelfDestruct = true;
-#if DEBUG
-        Debug.Log("[Scaffolds] Enabled self destruct");
-#endif
-      }
-    }
-
-    private void DisableSelfDestruct()
-    {
-      if (willSelfDestruct)
-      {
-        this.unscheduleDeconstruct();
-        willSelfDestruct = false;
-#if DEBUG
-        Debug.Log("[Scaffolds] Disabled self destruct");
-#endif
-      }
-    }
-
     protected override void OnCleanUp()
     {
-      this.deconstructHandle.ClearScheduler();
+      cleanedUp = true;
+      if (deconstructHandle.IsValid)
+      {
+        this.deconstructHandle.ClearScheduler();
+      }
+      FreeAnchorHandles();
+      if (registeredInNetwork)
+      {
+        registeredInNetwork = false;
+        ScaffoldNetworkManager.Unregister(this);
+      }
       base.OnCleanUp();
 #if DEBUG
       Debug.Log("[Scaffolds] Scaffold finished OnCleanUp");
-#endif
-    }
-
-
-    private void OnCopySettings(object data)
-    {
-      GameObject gameObject = (GameObject)data;
-      if (gameObject != null)
-      {
-        Scaffold component = gameObject.GetComponent<Scaffold>();
-        if (component != null)
-        {
-          //this is copying settings TO the local variables from clipboard component
-          if (component.willSelfDestruct)
-          {
-#if DEBUG
-            Debug.Log("[Scaffolds] Enabling self destruct from a setting paste.");
-#endif
-            EnableSelfDestruct();
-          }
-          else
-          {
-#if DEBUG
-            Debug.Log("[Scaffolds] Disabling self destruct from a setting paste.");
-#endif
-            DisableSelfDestruct();
-          }
-        }
-      }
-    }
-
-    private void OnRefreshUserMenu(object data)
-    {
-      KIconButtonMenu.ButtonInfo button = willSelfDestruct ? new KIconButtonMenu.ButtonInfo("action_switch_toggle", ScaffoldConfig.SelfDestructButtonCancelText, DisableSelfDestruct, Action.NumActions, null, null, null, ScaffoldConfig.SelfDestructButtonCancelTooltip) : new KIconButtonMenu.ButtonInfo("action_switch_toggle", ScaffoldConfig.SelfDestructButtonText, EnableSelfDestruct, Action.NumActions, null, null, null, ScaffoldConfig.SelfDestructButtonTooltip);
-      Game.Instance.userMenu.AddButton(base.gameObject, button);
-#if DEBUG
-      Debug.Log($"[Scaffolds] Scaffold user menu refreshed, new button based on willSelfDestruct: {willSelfDestruct}");
 #endif
     }
   }
