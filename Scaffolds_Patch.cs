@@ -11,11 +11,10 @@ namespace Scaffolds
 {
   public sealed class Scaffolds_Patch : UserMod2
   {
-    public static ScaffoldsSettings Settings { get; private set; }
+    public static ScaffoldsSettings Settings { get; private set; } = new ScaffoldsSettings();
 
     public override void OnLoad(Harmony harmony)
     {
-      base.OnLoad(harmony);
       PUtil.InitLibrary(false);
       POptions pOptions = new POptions();
       pOptions.RegisterOptions(this, typeof(ScaffoldsSettings));
@@ -23,6 +22,7 @@ namespace Scaffolds
       Debug.Log("[Scaffolds] Reading settings");
 #endif
       Settings = POptions.ReadSettings<ScaffoldsSettings>() ?? new ScaffoldsSettings();
+      base.OnLoad(harmony);
 #if DEBUG
       Debug.Log("[Scaffolds] Loaded");
 #endif
@@ -137,10 +137,131 @@ namespace Scaffolds
           }
         }
       }
+
+      [HarmonyPatch(typeof(Db), nameof(Db.Initialize))]
+      public static class Db_Initialize_Patch
+      {
+        public static void Postfix()
+        {
+          Db db = Db.Get();
+          if (db != null && db.Techs != null)
+          {
+            Tech tech = db.Techs.Get("RefinedObjects");
+            if (tech != null && tech.unlockedItemIDs != null && !tech.unlockedItemIDs.Contains(ScaffoldConfig.ID))
+            {
+              tech.unlockedItemIDs.Add(ScaffoldConfig.ID);
+#if DEBUG
+              Debug.Log("[Scaffolds] Added Scaffold to RefinedObjects (Refined Renovations) tech");
+#endif
+            }
+          }
+        }
+      }
+
+      [HarmonyPatch(
+        typeof(BuildingDef),
+        nameof(BuildingDef.IsValidPlaceLocation),
+        new Type[]
+        {
+          typeof(GameObject),
+          typeof(int),
+          typeof(Orientation),
+          typeof(bool),
+          typeof(string),
+          typeof(bool)
+        },
+        new ArgumentType[]
+        {
+          ArgumentType.Normal,
+          ArgumentType.Normal,
+          ArgumentType.Normal,
+          ArgumentType.Normal,
+          ArgumentType.Out,
+          ArgumentType.Normal
+        })]
+      public static class BuildingDef_IsValidPlaceLocation_Patch
+      {
+        public static void Postfix(BuildingDef __instance, int cell, ref string fail_reason, ref bool __result)
+        {
+          if (__result && __instance != null && __instance.PrefabID == ScaffoldConfig.ID)
+          {
+            if (!ScaffoldNetworkManager.HasSupportForPlacement(cell))
+            {
+              __result = false;
+              fail_reason = ScaffoldConfig.UnsupportedLocation;
+            }
+          }
+        }
+      }
+
+      [HarmonyPatch(
+        typeof(BipedTransitionLayer),
+        nameof(BipedTransitionLayer.BeginTransition),
+        new Type[]
+        {
+          typeof(Navigator),
+          typeof(Navigator.ActiveTransition)
+        })]
+      public static class BipedTransitionLayer_BeginTransition_Patch
+      {
+        public static void Postfix(Navigator navigator, Navigator.ActiveTransition transition)
+        {
+          if (navigator == null || transition == null)
+          {
+            return;
+          }
+
+          if (transition.x != 0 || transition.start != NavType.Ladder || transition.end != NavType.Ladder)
+          {
+            return;
+          }
+
+          int cell = Grid.PosToCell(navigator);
+          if (!Grid.IsValidCell(cell))
+          {
+            return;
+          }
+
+          if (!ScaffoldNetworkManager.ActiveScaffolds.TryGetValue(cell, out Scaffold scaffold) || scaffold == null)
+          {
+            return;
+          }
+
+          GameObject building = Grid.Objects[cell, (int)ObjectLayer.Building];
+          if (building != null && building.GetComponent<Ladder>() != null)
+          {
+            return;
+          }
+
+          float multiplier = ScaffoldNetworkManager.GetClimbSpeedMultiplier(navigator, scaffold, transition.y);
+          transition.speed *= multiplier;
+          transition.animSpeed *= multiplier;
+        }
+      }
+
+      [HarmonyPatch(typeof(Game), "OnSpawn")]
+      public static class Game_OnSpawn_Patch
+      {
+        public static void Postfix(Game __instance)
+        {
+          if (__instance != null)
+          {
+            ScaffoldNetworkManager.EnsureTicker(__instance.gameObject);
+          }
+        }
+      }
+
+      [HarmonyPatch(typeof(Game), "OnDestroy")]
+      public static class Game_OnDestroy_Patch
+      {
+        public static void Prefix()
+        {
+          ScaffoldNetworkManager.Clear();
+        }
+      }
     }
   }
 
-  // TODO: Switch to using PLib for these build menu utilities
   public static class Utils
   {
     // Copied many times, originally from romen

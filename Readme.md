@@ -1,19 +1,31 @@
-# Introducing the Scaffolds mod!
+# Scaffolds (Balanced)
 
-Enhance your duplicants' mobility with this instantly deployed scaffold. Place it in any non-tile cell, yes even directly on top of existing structures! You will get temporary ladder-like access without using any resources or taking any dupe time to build. Unlike ladders, these Scaffolds live in a different layer so they can give you a leg up in construction projects when you just want to reach that last corner without having to build and deconstruct annoying ladders that prevent you from placing the building you care about. The Scaffold self-destructs after 10 cycles, ensuring clean final builds as your colony reaches new heights!
+A rebalanced fork of [nathantalewis/oni-scaffolds](https://github.com/nathantalewis/oni-scaffolds). Scaffolds are still free and built instantly, but now they need structural support, can collapse, slow down heavily loaded dupes and must be researched.
+
+## Original mod
+
+Enhance your duplicants' mobility with this instantly deployed scaffold. Place it in any non-tile cell, yes even directly on top of existing structures! You will get temporary ladder-like access without using any resources or taking any dupe time to build. Unlike ladders, these Scaffolds live in a different layer so they can give you a leg up in construction projects when you just want to reach that last corner without having to build and deconstruct annoying ladders that prevent you from placing the building you care about. The Scaffold self-destructs after 3 cycles, ensuring clean final builds as your colony reaches new heights!
 
 Have you ever been planning out a build, placing buildings left-and-right only to realize at the end that there is no way for your dupes to climb around to reach everything? It's too late to add ladders, since a ladder can't be in the same tile as a planned building. Well, now you can just instantly add a few Scaffolds in the right spots and go on to your next exciting endeavour while your dupes queue up their work tasks.
 
 Scaffolds are rickety eyesores, as such, there is a movement penalty when going up or down one plus a decor penalty.
 
-**_Caution!_** Because these Scaffolds automatically deconstruct themselves after 10 cycles by default, if a dupe relies on a Scaffold to get somewhere they are likely to end up trapped when the Scaffold disappears. There is a toggle on each Scaffold that can be used to disable the automatic deconstruction for that Scaffold if you want a Scaffold to stay around forever. That setting can then be copied to other Scaffolds.
+**_Caution!_** Because these Scaffolds automatically deconstruct themselves after 3 cycles by default, if a dupe relies on a Scaffold to get somewhere they are likely to end up trapped when the Scaffold disappears. Scaffolds are always temporary; there is no permanent toggle.
+
+### Balance changes in this fork
+
+- **Research:** Scaffolds unlock with **Refined Renovations**.
+- **Support:** a Scaffold can only be placed next to a solid tile, a ladder (or fire pole) or another supported Scaffold.
+- **Instability:** if a connected group of Scaffolds loses every link to a tile or ladder, it turns orange, wobbles slightly and shows *Unstable: collapses in X*. Restore support within half a cycle (300 s) to stabilize it.
+- **Collapse:** when the timer runs out, the whole unsupported group falls apart row by row from the top.
+- **Heavy loads:** a dupe carrying at least half of their carry capacity climbs Scaffolds at 25% speed instead of the normal Scaffold penalty.
+- **Performance:** support is tracked by one central manager. Stable Scaffolds run no per-tick code, and only Scaffolds touching a tile or ladder listen for changes.
 
 ### Mod Options
 
 You can configure the Scaffolds Mod to best suit your play style. From the main screen, choose Mods and then press the Options button on the Scaffolds mod.
 
-- Permanent by Default: If you set this to true, then all new scaffolds you place will default to being permanent scaffolds. Once a scaffold is built, you can still toggle it to self-destruct with the button in the info card.
-- Duration: The number of cycles that non-permanent scaffolds live before they self-destruct.
+- Duration: The number of cycles that scaffolds live before they self-destruct (default 3).
 - Decor Penalty Value: How ugly Scaffolds will be. Higher values mean more of a penalty. For reference, normal Ladders have a decor penalty of 5.
 - Decor Penalty Radius: How many tiles away the decor penalty will be applied. For reference, normal Ladders have a radius of 1.
 - Upwards Speed Penalty: How much slower dupes moving upwards on Scaffolds will be. This is a percent between 0 and 99, with 0 being no penalty and 99 preventing almost all movement.
@@ -26,7 +38,10 @@ You can configure the Scaffolds Mod to best suit your play style. From the main 
 - Make it possible to replace a scaffold with a ladder or plastic ladder without it showing as red when trying to place them
 - Use Attachment points (like the Ladder Bed does) to make sure scaffolds can only be used if connected to a floor
   - This is more of an aesthetic idea, since a scaffold's wheels hanging in the middle of the air is kind of awkward
-- Require some level of research to unlock Scaffolds?
+
+### Building
+
+Run `dotnet build Scaffolds.csproj -c Release` (set `ONIPath` if the game is not in `D:\SteamLibrary\steamapps\common\OxygenNotIncluded`). PLib is merged in and `Scaffolds.dll` is written to the repository root, so the folder can be used directly as a local mod.
 
 ### Known issues
 

@@ -8,10 +8,6 @@ using PeterHan.PLib.Options;
 [ModInfo("https://www.github.com/nathantalewis/oni-scaffolds")]
 public class ScaffoldsSettings
 {
-  [Option("Permanent by Default", "If true, new scaffolds will be permanent by default.", "Removal")]
-  [JsonProperty]
-  public bool PermanentByDefault { get; set; }
-
   [Option("Duration", "How many cycles each scaffold lasts before it self destructs.", "Removal")]
   [Limit(0.1f, 100.0f)]
   [JsonProperty]
@@ -39,8 +35,7 @@ public class ScaffoldsSettings
 
   public ScaffoldsSettings()
   {
-    PermanentByDefault = false;
-    Duration = 10.0f;
+    Duration = 3.0f;
     DecorPenaltyValue = 10;
     DecorPenaltyRadius = 2;
     UpwardsSpeedPenalty = 25;
