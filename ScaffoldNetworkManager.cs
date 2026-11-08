@@ -8,7 +8,8 @@ namespace Scaffolds
   public static class ScaffoldNetworkManager
   {
     public const float DefaultUnstableDuration = 300f;
-    public const float JiggleAmplitude = 0.03f;
+    public const float JiggleAmplitude = 0.012f;
+    public const float CollapseWaveInterval = 0.6f;
     public const float HeavyLoadSpeedMultiplier = 0.25f;
     private const float FallbackCarryCapacity = 200f;
 
@@ -19,6 +20,7 @@ namespace Scaffolds
       public bool collapsing;
       public readonly List<List<int>> waves = new List<List<int>>();
       public int nextWaveIndex;
+      public float waveCooldown;
     }
 
     private struct NavigatorCarryCache
@@ -60,6 +62,45 @@ namespace Scaffolds
     internal static void SetTicker(ScaffoldNetworkTicker instance)
     {
       ticker = instance;
+    }
+
+    private static StatusItem unstableStatusItem;
+
+    public static StatusItem UnstableStatusItem
+    {
+      get
+      {
+        if (unstableStatusItem == null)
+        {
+          unstableStatusItem = new StatusItem(
+            "SCAFFOLDUNSTABLE",
+            ScaffoldConfig.UnstableStatusName,
+            ScaffoldConfig.UnstableStatusTooltip,
+            "status_item_exclamation",
+            StatusItem.IconType.Exclamation,
+            NotificationType.BadMinor,
+            false,
+            OverlayModes.None.ID);
+          unstableStatusItem.resolveStringCallback = ResolveUnstableString;
+          unstableStatusItem.resolveTooltipCallback = ResolveUnstableString;
+        }
+        return unstableStatusItem;
+      }
+    }
+
+    private static string ResolveUnstableString(string str, object data)
+    {
+      Scaffold scaffold = data as Scaffold;
+      if (scaffold == null)
+      {
+        return str;
+      }
+      if (scaffold.Group != null && scaffold.Group.collapsing)
+      {
+        return ScaffoldConfig.CollapsingStatusName;
+      }
+      float remaining = scaffold.unstableTimeRemaining >= 0f ? scaffold.unstableTimeRemaining : DefaultUnstableDuration;
+      return str.Replace("{0}", GameUtil.GetFormattedTime(remaining));
     }
 
     public static bool IsSupportCell(int cell)
@@ -446,6 +487,7 @@ namespace Scaffolds
       group.timeRemaining = timeRemaining;
       group.collapsing = false;
       group.nextWaveIndex = 0;
+      group.waveCooldown = 0f;
       return group;
     }
 
@@ -522,6 +564,12 @@ namespace Scaffolds
 
           if (group.collapsing)
           {
+            group.waveCooldown -= dt;
+            if (group.waveCooldown > 0f)
+            {
+              continue;
+            }
+            group.waveCooldown = CollapseWaveInterval;
             ProcessNextCollapseWave(group);
 
             if (group.nextWaveIndex >= group.waves.Count || group.cells.Count == 0)

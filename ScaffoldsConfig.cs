@@ -15,6 +15,9 @@ namespace Scaffolds
     public static LocString DeconstructButtonText = "Remove";
     public static LocString DeconstructButtonTooltip = "Instantly remove this scaffold";
     public static LocString UnsupportedLocation = "Scaffold needs support: place next to a solid tile, a ladder or a supported scaffold";
+    public static LocString UnstableStatusName = "Unstable: collapses in {0}";
+    public static LocString UnstableStatusTooltip = "This scaffold has lost its support and will collapse in {0}. Place a solid tile, a ladder or a supported scaffold next to it to stabilize it.";
+    public static LocString CollapsingStatusName = "Collapsing!";
     public static ObjectLayer ObjectLayer = ObjectLayer.FillPlacer; // This layer doesn't seem to be used anywhere else... hopefully
 
     public override BuildingDef CreateBuildingDef()

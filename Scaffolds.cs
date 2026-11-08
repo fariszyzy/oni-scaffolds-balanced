@@ -25,6 +25,8 @@ namespace Scaffolds
     public bool IsAnchor { get; private set; }
 
     internal KBatchedAnimController animController;
+    private KSelectable selectable;
+    private bool showingUnstableStatus;
     internal ScaffoldNetworkManager.UnstableGroup Group;
     internal int GroupIndex = -1;
 
@@ -54,6 +56,7 @@ namespace Scaffolds
       cleanedUp = false;
       Cell = Grid.PosToCell(this);
       animController = GetComponent<KBatchedAnimController>();
+      selectable = GetComponent<KSelectable>();
 
       float now = GameClock.Instance.GetTime();
       float timeRemaining = deconstructMoment < 0f
@@ -162,6 +165,11 @@ namespace Scaffolds
       {
         animController.TintColour = UnstableTint;
       }
+      if (!showingUnstableStatus && selectable != null)
+      {
+        selectable.SetStatusItem(Db.Get().StatusItemCategories.Main, ScaffoldNetworkManager.UnstableStatusItem, this);
+        showingUnstableStatus = true;
+      }
     }
 
     public void ResetVisuals()
@@ -171,6 +179,11 @@ namespace Scaffolds
         animController.Offset = Vector3.zero;
         animController.TintColour = NormalTint;
       }
+      if (showingUnstableStatus && selectable != null)
+      {
+        selectable.SetStatusItem(Db.Get().StatusItemCategories.Main, Db.Get().BuildingStatusItems.Normal);
+      }
+      showingUnstableStatus = false;
     }
 
     private void scheduleDeconstruct(float timeRemaining)

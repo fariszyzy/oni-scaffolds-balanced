@@ -146,12 +146,12 @@ namespace Scaffolds
           Db db = Db.Get();
           if (db != null && db.Techs != null)
           {
-            Tech tech = db.Techs.Get("BasicRefinement");
+            Tech tech = db.Techs.Get("RefinedObjects");
             if (tech != null && tech.unlockedItemIDs != null && !tech.unlockedItemIDs.Contains(ScaffoldConfig.ID))
             {
               tech.unlockedItemIDs.Add(ScaffoldConfig.ID);
 #if DEBUG
-              Debug.Log("[Scaffolds] Added Scaffold to BasicRefinement tech");
+              Debug.Log("[Scaffolds] Added Scaffold to RefinedObjects (Refined Renovations) tech");
 #endif
             }
           }
