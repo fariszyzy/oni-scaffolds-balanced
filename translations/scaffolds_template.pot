@@ -3,6 +3,11 @@ msgstr ""
 "Application: Oxygen Not Included"
 "POT Version: 2.0"
 
+#. Scaffolds.ScaffoldConfig.CollapsingStatusName
+msgctxt "Scaffolds.ScaffoldConfig.CollapsingStatusName"
+msgid "Collapsing!"
+msgstr ""
+
 #. Scaffolds.ScaffoldConfig.DeconstructButtonText
 msgctxt "Scaffolds.ScaffoldConfig.DeconstructButtonText"
 msgid "Remove"
@@ -31,6 +36,16 @@ msgstr ""
 #. Scaffolds.ScaffoldConfig.Free_insta_build
 msgctxt "Scaffolds.ScaffoldConfig.Free_insta_build"
 msgid "Free insta-build!"
+msgstr ""
+
+#. Scaffolds.ScaffoldConfig.UnstableStatusName
+msgctxt "Scaffolds.ScaffoldConfig.UnstableStatusName"
+msgid "Unstable: collapses in {0}"
+msgstr ""
+
+#. Scaffolds.ScaffoldConfig.UnstableStatusTooltip
+msgctxt "Scaffolds.ScaffoldConfig.UnstableStatusTooltip"
+msgid "This scaffold has lost its support and will collapse in {0}. Place a solid tile, a ladder or a supported scaffold next to it to stabilize it."
 msgstr ""
 
 #. Scaffolds.ScaffoldConfig.UnsupportedLocation
